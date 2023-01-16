@@ -3,13 +3,15 @@ package transfer
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/rodolfoalvesg/api-banking/api/domain/entities/transfers"
+	"github.com/stretchr/testify/assert"
 )
+
+var ErrorTransfersNoListed = errors.New("transfers not listed")
 
 //TestCreateTransfer, teste de caso de uso para criar e registrar transferência
 func TestCreateTransfer(t *testing.T) {
@@ -81,6 +83,7 @@ func TestShowTransfers(t *testing.T) {
 		name         string
 		transferMock transfers.TransferMock
 		accId        string
+		wantErr      error
 		want         []transfers.Transfer
 	}
 
@@ -94,18 +97,20 @@ func TestShowTransfers(t *testing.T) {
 					return myListTransfers, nil
 				},
 			},
-			accId: uuid.New().String(),
-			want:  myListTransfers,
+			accId:   uuid.New().String(),
+			wantErr: nil,
+			want:    []transfers.Transfer{},
 		},
 		{
-			name: "Error: transfers not listed",
+			name: "transfers not listed",
 			transferMock: transfers.TransferMock{
 				OnListAllTransfer: func(string) ([]transfers.Transfer, error) {
-					return []transfers.Transfer{}, errors.New("transfers not listed")
+					return []transfers.Transfer{}, ErrorTransfersNoListed
 				},
 			},
-			accId: uuid.New().String(),
-			want:  []transfers.Transfer{},
+			accId:   uuid.New().String(),
+			wantErr: ErrorTransfersNoListed,
+			want:    []transfers.Transfer{},
 		},
 	}
 
@@ -119,9 +124,9 @@ func TestShowTransfers(t *testing.T) {
 			})
 
 			listedAllTransfers, err := usecase.ShowTransfers(context.Background(), tt.accId)
-			if !reflect.DeepEqual(listedAllTransfers, tt.want) && err != nil {
-				t.Errorf("%s, want %v, got %v", tt.name, tt.want, listedAllTransfers)
-			}
+			assert.ErrorIs(t, err, tt.wantErr)
+			assert.ElementsMatch(t, tt.want, listedAllTransfers)
+
 		})
 	}
 
